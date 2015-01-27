@@ -76,15 +76,19 @@ def __save_chapter(session, chapter, output):
     if __check_already_downloaded(zipfile_path):
         return
 
+    # bypass javascript enable check
     __resolve_js_block(session, chapter.url)
 
+    # create zipfile
     zf = zipfile.ZipFile(zipfile_path, 'w')
     os.mkdir(working_dir)
     os.chdir(working_dir)
 
+    # get image elements
     soup = BeautifulSoup(session.get(chapter.url).text)
     img_list = soup.find('p').find_all('a') or soup.find('p').find_all('img')
 
+    # download and save image from image url
     cnt = 1
     for img in img_list:
         if 'href' in img.attrs:
@@ -104,6 +108,9 @@ def __save_chapter(session, chapter, output):
         zf.write(filename)
         cnt += 1
     zf.close()
+
+    # clean working directory
+    os.chdir(output)
     shutil.rmtree(working_dir)
 
 
