@@ -6,11 +6,10 @@ import requests
 import os
 import shutil
 from PIL import Image
-from io import BytesIO
 import zipfile
 
 
-TITLE_SIGNATURE = 'MARUMARU - 마루마루 - '
+TITLE_SIGNATURE = u'MARUMARU - 마루마루 - '
 COOKIE_SIGNATURE = 'if(document.cookie.indexOf(\'sucuri_uidc='
 COOKIE_NAME = 'sucuri_uidc'
 CUSTOM_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \
@@ -25,8 +24,8 @@ def __get_title(entry_page_tree):
 def __get_chapters(entry_page_tree):
     '''[Internal]'''
     chapters = []
-    for center in entry_page_tree.find(id='vContent').find_all('center')[1:]:
-        for a in center.find_all('a'):
+    for a in entry_page_tree.find(id='vContent').find_all('a')[1:]:
+        if 'http://www.mangaumaru.com/archives/' in a['href']:
             chapters.append((a['href'], a.get_text()))
     return chapters
 
@@ -68,8 +67,20 @@ def __save_chapter(session, chapter, output):
     cnt = 1
 
     soup = BeautifulSoup(session.get(chapter[0]).text)
-    for a in soup.find('p').find_all('a'):
-        i = Image.open(BytesIO(session.get(a['href']).content))
+    img_list = soup.find('p').find_all('a') or soup.find('p').find_all('img')
+    for img in img_list:
+        if 'href' in img.attrs:
+            img_url = img.attrs['href']
+        elif 'data-lazy-src' in img.attrs:
+            img_url = img.attrs['data-lazy-src']
+        else:
+            img_url = img.attrs['src']
+        try:
+            from io import BytesIO
+            i = Image.open(BytesIO(session.get(img_url).content))
+        except:
+            from StringIO import StringIO
+            i = Image.open(StringIO(session.get(img_url).content))
         filename = '%d.jpg' % (cnt)
         i.save(filename)
         zf.write(filename)
@@ -100,4 +111,8 @@ def download(url, output='./output'):
 
 
 if __name__ == '__main__':
-    download('http://marumaru.in/b/manga/67808')
+    import sys
+    url = 'http://marumaru.in/b/manga/67808'
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
+    download(url)
