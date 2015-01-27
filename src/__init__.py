@@ -7,6 +7,7 @@ import os
 import shutil
 from PIL import Image
 import zipfile
+from collections import namedtuple
 
 
 TITLE_SIGNATURE = u'MARUMARU - 마루마루 - '
@@ -24,9 +25,12 @@ def __get_title(entry_page_tree):
 def __get_chapters(entry_page_tree):
     '''[Internal]'''
     chapters = []
+    Chapter = namedtuple('Chapter', ['url', 'name'])
     for a in entry_page_tree.find(id='vContent').find_all('a')[1:]:
-        if 'http://www.mangaumaru.com/archives/' in a['href']:
-            chapters.append((a['href'], a.get_text()))
+        url = a['href']
+        name = a.get_text(strip=True)
+        if 'http://www.mangaumaru.com/archives/' in url and name:
+            chapters.append(Chapter(url, name))
     return chapters
 
 
@@ -40,17 +44,11 @@ def __make_output_dir(output, title):
     return os.path.abspath(path)
 
 
-def __save_chapter(session, chapter, output):
+def __resolve_js_block(session, chapter_url):
     '''[Internal]'''
-    working_dir = os.path.join(output, chapter[1])
-    chapter_zip = working_dir + '.zip'
-    if os.path.exists(chapter_zip):
-        print('%s is already downloaded' % (chapter_zip))
-        return
-
-    domain = chapter[0].split('/')[2]
-    path = chapter[0].split('/')[3]
-    r = session.get(chapter[0])
+    domain = chapter_url.split('/')[2]
+    path = chapter_url.split('/')[3]
+    r = session.get(chapter_url)
     if COOKIE_SIGNATURE in r.text:
         idx = r.text.find(COOKIE_SIGNATURE) + len(COOKIE_SIGNATURE)
         value = r.text[idx:r.text.find('\'', idx)]
@@ -59,15 +57,35 @@ def __save_chapter(session, chapter, output):
             value,
             domain=domain,
             path='/' + path)
-        session.headers.update({'Referer': chapter[0]})
+        session.headers.update({'Referer': chapter_url})
 
-    zf = zipfile.ZipFile(chapter_zip, 'w')
+
+def __check_already_downloaded(zipfile_path):
+    '''[Internal]'''
+    if os.path.exists(zipfile_path):
+        print('%s is already downloaded' % (zipfile_path))
+        return True
+    return False
+
+
+def __save_chapter(session, chapter, output):
+    '''[Internal]'''
+    working_dir = os.path.join(output, chapter.name)
+    zipfile_path = working_dir + '.zip'
+
+    if __check_already_downloaded(zipfile_path):
+        return
+
+    __resolve_js_block(session, chapter.url)
+
+    zf = zipfile.ZipFile(zipfile_path, 'w')
     os.mkdir(working_dir)
     os.chdir(working_dir)
-    cnt = 1
 
-    soup = BeautifulSoup(session.get(chapter[0]).text)
+    soup = BeautifulSoup(session.get(chapter.url).text)
     img_list = soup.find('p').find_all('a') or soup.find('p').find_all('img')
+
+    cnt = 1
     for img in img_list:
         if 'href' in img.attrs:
             img_url = img.attrs['href']
