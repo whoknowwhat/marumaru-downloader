@@ -3,11 +3,10 @@
 
 from bs4 import BeautifulSoup
 import requests
-import time
 import os
 import shutil
 from PIL import Image
-from io import StringIO
+from io import BytesIO
 import zipfile
 
 
@@ -37,39 +36,46 @@ def __make_output_dir(output, title):
     if not os.path.exists(output):
         os.mkdir(output)
     path = os.path.join(output, title)
-    if os.path.exists(path):
-        shutil.rmtree(path)
-    os.mkdir(path)
-    return path
+    if not os.path.exists(path):
+        os.mkdir(path)
+    return os.path.abspath(path)
 
 
 def __save_chapter(session, chapter, output):
     '''[Internal]'''
+    working_dir = os.path.join(output, chapter[1])
+    chapter_zip = working_dir + '.zip'
+    if os.path.exists(chapter_zip):
+        print('%s is already downloaded' % (chapter_zip))
+        return
+
     domain = chapter[0].split('/')[2]
+    path = chapter[0].split('/')[3]
     r = session.get(chapter[0])
     if COOKIE_SIGNATURE in r.text:
         idx = r.text.find(COOKIE_SIGNATURE) + len(COOKIE_SIGNATURE)
         value = r.text[idx:r.text.find('\'', idx)]
-        session.cookies.set(COOKIE_NAME, value, domain=domain, expires=1000)
+        session.cookies.set(
+            COOKIE_NAME,
+            value,
+            domain=domain,
+            path='/' + path)
         session.headers.update({'Referer': chapter[0]})
-        session.headers.update({'User-Agent': CUSTOM_USER_AGENT})
 
-    print(session.cookies)
-    soup = BeautifulSoup(session.get(chapter[0]).text)
-    print(soup)
-    print(chapter[0])
-    path = os.path.join(output, chapter[1])
-    zf = zipfile.ZipFile(path + '.zip', 'w')
-    os.mkdir(path)
+    zf = zipfile.ZipFile(chapter_zip, 'w')
+    os.mkdir(working_dir)
+    os.chdir(working_dir)
     cnt = 1
+
+    soup = BeautifulSoup(session.get(chapter[0]).text)
     for a in soup.find('p').find_all('a'):
-        i = Image.open(StringIO(session.get(a['href']).content))
-        filename = os.path.join(path, '%d.jpg' % (cnt))
+        i = Image.open(BytesIO(session.get(a['href']).content))
+        filename = '%d.jpg' % (cnt)
         i.save(filename)
         zf.write(filename)
         cnt += 1
     zf.close()
-    shutil.rmtree(path)
+    shutil.rmtree(working_dir)
 
 
 def download(url, output='./output'):
@@ -85,11 +91,12 @@ def download(url, output='./output'):
         >>>          './output')
     """
     s = requests.Session()
+    s.headers.update({'User-Agent': CUSTOM_USER_AGENT})
+
     entry_page_tree = BeautifulSoup(s.get(url).text)
     output_dir_path = __make_output_dir(output, __get_title(entry_page_tree))
     for chapter in __get_chapters(entry_page_tree):
         __save_chapter(s, chapter, output_dir_path)
-        time.sleep(3)
 
 
 if __name__ == '__main__':
