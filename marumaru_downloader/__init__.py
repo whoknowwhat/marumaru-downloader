@@ -11,14 +11,8 @@ from collections import namedtuple
 import logging
 
 
-try:
-    from logging import NullHandler
-except ImportError:
-    class NullHandler(logging.Handler):
-        def emit(self, record):
-            pass
-
-logging.getLogger(__name__).addHandler(NullHandler)
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
 
 
 __title__ = 'marumaru-downloader'
@@ -80,7 +74,7 @@ def __resolve_js_block(session, chapter_url):
 def __check_already_downloaded(zipfile_path):
     '''[Internal]'''
     if os.path.exists(zipfile_path):
-        print('%s is already downloaded' % (zipfile_path))
+        logger.debug('%s is already downloaded' % (zipfile_path))
         return True
     return False
 
@@ -97,7 +91,7 @@ def __save_chapter(session, chapter, output):
     __resolve_js_block(session, chapter.url)
 
     # create zipfile
-    logging.debug('Start archiving [%s] >>' % (zipfile_path))
+    logger.debug('Start archiving [%s] >>' % (zipfile_path))
     zf = zipfile.ZipFile(zipfile_path, 'w')
     os.mkdir(working_dir)
     os.chdir(working_dir)
@@ -115,8 +109,6 @@ def __save_chapter(session, chapter, output):
             img_url = img.attrs['data-lazy-src']
         else:
             img_url = img.attrs['src']
-        logging.debug('Downloading [%s] >> [%s]' % (
-                img_url, filename))
         try:
             from io import BytesIO
             i = Image.open(BytesIO(session.get(img_url).content))
@@ -124,11 +116,13 @@ def __save_chapter(session, chapter, output):
             from StringIO import StringIO
             i = Image.open(StringIO(session.get(img_url).content))
         filename = '%d.jpg' % (cnt)
+        logger.debug('Downloading [%s] >> [%s]' % (
+                img_url, os.path.join(working_dir, filename)))
         i.save(filename)
         zf.write(filename)
         cnt += 1
     zf.close()
-    logging.debug('Finish archiving [%s] <<' % (zipfile_path))
+    logger.debug('Finish archiving [%s] <<' % (zipfile_path))
 
     # clean working directory
     os.chdir(output)
@@ -153,11 +147,11 @@ def download(url, output='./output'):
     entry_page_tree = BeautifulSoup(s.get(url).text)
     title = __get_title(entry_page_tree)
     output_dir_path = __make_output_dir(output, title)
-    logging.debug('Start downloading [%s(%s)] >> [%s]' % (title, url,
+    logger.debug('Start downloading [%s(%s)] >> [%s]' % (title, url,
         output_dir_path))
     for chapter in __get_chapters(entry_page_tree):
         __save_chapter(s, chapter, output_dir_path)
-    logging.debug('Finish downloading [%s(%s)] >> [%s]' % (title, url,
+    logger.debug('Finish downloading [%s(%s)] >> [%s]' % (title, url,
         output_dir_path))
 
 
