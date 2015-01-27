@@ -8,6 +8,23 @@ import shutil
 from PIL import Image
 import zipfile
 from collections import namedtuple
+import logging
+
+
+try:
+    from logging import NullHandler
+except ImportError:
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
+
+logging.getLogger(__name__).addHandler(NullHandler)
+
+
+__title__ = 'marumaru-downloader'
+__version__ = '0.1.0'
+__build__ = 0x000100
+__author__ = 'eM'
 
 
 TITLE_SIGNATURE = u'MARUMARU - 마루마루 - '
@@ -80,6 +97,7 @@ def __save_chapter(session, chapter, output):
     __resolve_js_block(session, chapter.url)
 
     # create zipfile
+    logging.debug('Start archiving [%s] >>' % (zipfile_path))
     zf = zipfile.ZipFile(zipfile_path, 'w')
     os.mkdir(working_dir)
     os.chdir(working_dir)
@@ -97,6 +115,8 @@ def __save_chapter(session, chapter, output):
             img_url = img.attrs['data-lazy-src']
         else:
             img_url = img.attrs['src']
+        logging.debug('Downloading [%s] >> [%s]' % (
+                img_url, filename))
         try:
             from io import BytesIO
             i = Image.open(BytesIO(session.get(img_url).content))
@@ -108,6 +128,7 @@ def __save_chapter(session, chapter, output):
         zf.write(filename)
         cnt += 1
     zf.close()
+    logging.debug('Finish archiving [%s] <<' % (zipfile_path))
 
     # clean working directory
     os.chdir(output)
@@ -130,14 +151,24 @@ def download(url, output='./output'):
     s.headers.update({'User-Agent': CUSTOM_USER_AGENT})
 
     entry_page_tree = BeautifulSoup(s.get(url).text)
-    output_dir_path = __make_output_dir(output, __get_title(entry_page_tree))
+    title = __get_title(entry_page_tree)
+    output_dir_path = __make_output_dir(output, title)
+    logging.debug('Start downloading [%s(%s)] >> [%s]' % (title, url,
+        output_dir_path))
     for chapter in __get_chapters(entry_page_tree):
         __save_chapter(s, chapter, output_dir_path)
+    logging.debug('Finish downloading [%s(%s)] >> [%s]' % (title, url,
+        output_dir_path))
 
 
 if __name__ == '__main__':
     import sys
     url = 'http://marumaru.in/b/manga/67808'
-    if len(sys.argv) > 1:
+    output = './output'
+    logger.setLevel(logging.DEBUG)
+    if len(sys.argv) == 2:
         url = sys.argv[1]
-    download(url)
+    elif len(sys.argv) == 3:
+        url = sys.argv[1]
+        output = sys.argv[2]
+    download(url, output)
