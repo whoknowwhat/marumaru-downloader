@@ -8,6 +8,7 @@ import shutil
 from PIL import Image
 import zipfile
 from collections import namedtuple
+import re
 import logging
 
 
@@ -33,14 +34,17 @@ def __get_title(entry_page_tree):
     return entry_page_tree.find('title').get_text()[len(TITLE_SIGNATURE):]
 
 
-def __get_chapters(entry_page_tree):
+def __get_chapters(entry_page_tree, title):
     '''[Internal]'''
     chapters = []
+    pattern = re.compile(u'^[0-9]+화$')
     Chapter = namedtuple('Chapter', ['url', 'name'])
     for a in entry_page_tree.find(id='vContent').find_all('a')[1:]:
         url = a['href']
         name = a.get_text(strip=True)
         if 'http://www.mangaumaru.com/archives/' in url and name:
+            if pattern.match(name):
+                name = '%s %s' % (title, name)
             chapters.append(Chapter(url, name))
     return chapters
 
@@ -74,12 +78,12 @@ def __resolve_js_block(session, chapter_url):
 def __check_already_downloaded(zipfile_path):
     '''[Internal]'''
     if os.path.exists(zipfile_path):
-        logger.debug('%s is already downloaded' % (zipfile_path))
+        logger.warning('%s is already downloaded' % (zipfile_path))
         return True
     return False
 
 
-def __save_chapter(session, chapter, output):
+def __save_chapter(session, title, chapter, output):
     '''[Internal]'''
     working_dir = os.path.join(output, chapter.name)
     zipfile_path = working_dir + '.zip'
@@ -91,7 +95,7 @@ def __save_chapter(session, chapter, output):
     __resolve_js_block(session, chapter.url)
 
     # create zipfile
-    logger.debug('Start archiving [%s] >>' % (zipfile_path))
+    logger.warning('Start archiving [%s] >>' % (zipfile_path))
     zf = zipfile.ZipFile(zipfile_path, 'w')
     os.mkdir(working_dir)
     os.chdir(working_dir)
@@ -122,7 +126,7 @@ def __save_chapter(session, chapter, output):
         zf.write(filename)
         cnt += 1
     zf.close()
-    logger.debug('Finish archiving [%s] <<' % (zipfile_path))
+    logger.warning('Finish archiving [%s] <<' % (zipfile_path))
 
     # clean working directory
     os.chdir(output)
@@ -147,11 +151,11 @@ def download(url, output='./output'):
     entry_page_tree = BeautifulSoup(s.get(url).text)
     title = __get_title(entry_page_tree)
     output_dir_path = __make_output_dir(output, title)
-    logger.debug('Start downloading [%s(%s)] >> [%s]' % (title, url,
+    logger.warning('Start downloading [%s(%s)] >> [%s]' % (title, url,
         output_dir_path))
-    for chapter in __get_chapters(entry_page_tree):
-        __save_chapter(s, chapter, output_dir_path)
-    logger.debug('Finish downloading [%s(%s)] >> [%s]' % (title, url,
+    for chapter in __get_chapters(entry_page_tree, title):
+        __save_chapter(s, title, chapter, output_dir_path)
+    logger.warning('Finish downloading [%s(%s)] >> [%s]' % (title, url,
         output_dir_path))
 
 
@@ -159,7 +163,7 @@ if __name__ == '__main__':
     import sys
     url = 'http://marumaru.in/b/manga/67808'
     output = './output'
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.WARNING)
     if len(sys.argv) == 2:
         url = sys.argv[1]
     elif len(sys.argv) == 3:
