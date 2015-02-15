@@ -137,7 +137,7 @@ def download(url, output='./output'):
     """Download comic file from marumaru entry url
 
     :param url: URL of title's entry page
-    'param output: Output directory
+    :param output: Output directory
 
     Usage::
 
