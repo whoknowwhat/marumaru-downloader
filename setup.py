@@ -1,9 +1,9 @@
 from distutils.core import setup
 
 setup(name='marumaru-downloader',
-      version='0.1.1',
+      version='0.1.2',
       description='Comic Downloader for marumaru.in',
-      url='https://bitbucket.org/whoknowwhat/marumaru-downloader',
+      url='https://github.com/whoknowwhat/marumaru-downloader',
       author='eM',
       author_email='whoknowwhat0623@gmail.com',
       packages=['marumaru_downloader'],

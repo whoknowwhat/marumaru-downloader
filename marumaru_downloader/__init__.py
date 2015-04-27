@@ -53,6 +53,7 @@ def __make_output_dir(output, title):
     '''[Internal]'''
     if not os.path.exists(output):
         os.mkdir(output)
+    title = title.replace(':', '-colon-')
     path = os.path.join(output, title)
     if not os.path.exists(path):
         os.mkdir(path)
