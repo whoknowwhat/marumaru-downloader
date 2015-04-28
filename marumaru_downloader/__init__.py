@@ -10,6 +10,8 @@ import zipfile
 from collections import namedtuple
 import re
 import logging
+from io import BytesIO
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -17,8 +19,8 @@ logger.addHandler(logging.StreamHandler())
 
 
 __title__ = 'marumaru-downloader'
-__version__ = '0.1.0'
-__build__ = 0x000100
+__version__ = '0.1.3'
+__build__ = 0x000103
 __author__ = 'eM'
 
 
@@ -39,10 +41,13 @@ def __get_chapters(entry_page_tree, title):
     chapters = []
     pattern = re.compile(u'^[0-9]+화$')
     Chapter = namedtuple('Chapter', ['url', 'name'])
-    for a in entry_page_tree.find(id='vContent').find_all('a')[1:]:
+    l = entry_page_tree.find(id='vContent').find_all('a')
+    if l[0].find('img') != None:
+        l = l[1:]
+    for a in l:
         url = a['href']
         name = a.get_text(strip=True)
-        if 'http://www.mangaumaru.com/archives/' in url and name:
+        if ('http://www.mangaumaru.com/archives/' in url or 'http://www.umaumaru.com/archives/' in url) and name:
             if pattern.match(name):
                 name = '%s %s' % (title, name)
             chapters.append(Chapter(url, name))
@@ -86,7 +91,7 @@ def __check_already_downloaded(zipfile_path):
 
 def __save_chapter(session, title, chapter, output):
     '''[Internal]'''
-    working_dir = os.path.join(output, chapter.name)
+    working_dir = os.path.join(output, chapter.name.replace(':', '-colon-'))
     zipfile_path = working_dir + '.zip'
 
     if __check_already_downloaded(zipfile_path):
@@ -102,8 +107,14 @@ def __save_chapter(session, title, chapter, output):
     os.chdir(working_dir)
 
     # get image elements
-    soup = BeautifulSoup(session.get(chapter.url).text)
-    img_list = soup.find('p').find_all('a') or soup.find('p').find_all('img')
+    while True:
+        try:
+            soup = BeautifulSoup(session.get(chapter.url).text)
+            img_list = soup.find('p').find_all('a') or soup.find('p').find_all('img')
+            break
+        except Exception as e:
+            logger.debug(e)
+            logger.warning('Unable to get page from url(%s). Retrying...' % (chapter.url))
 
     # download and save image from image url
     cnt = 1
@@ -114,17 +125,33 @@ def __save_chapter(session, title, chapter, output):
             img_url = img.attrs['data-lazy-src']
         else:
             img_url = img.attrs['src']
-        try:
-            from io import BytesIO
-            i = Image.open(BytesIO(session.get(img_url).content))
-        except:
-            from StringIO import StringIO
-            i = Image.open(StringIO(session.get(img_url).content))
-        filename = '%d.jpg' % (cnt)
-        logger.debug('Downloading [%s] >> [%s]' % (
-                img_url, os.path.join(working_dir, filename)))
-        i.save(filename)
-        zf.write(filename)
+        if 'imgur.com' in img_url:
+            continue
+        try_cnt = 3
+        while try_cnt > 0:
+            try:
+                i = Image.open(BytesIO(requests.get(img_url).content))
+                break
+            except Exception as e:
+                logger.debug(e)
+                logger.warning('Unable to download image from url(%s) [%d]' % (img_url, try_cnt))
+                time.sleep(5)
+                try_cnt -= 1
+        if try_cnt > 0:
+            ext = os.path.splitext(img_url)[1]
+            if 'jpg' in ext:
+                ext = '.jpg'
+            elif 'gif' in ext:
+                ext = '.gif'
+            elif 'png' in ext:
+                ext = '.png'
+            filename = '%d%s' % (cnt, ext)
+            logger.debug('Downloading [%s] >> [%s]' % (
+                    img_url, os.path.join(working_dir, filename)))
+            i.save(filename)
+            zf.write(filename)
+        else:
+            logger.warning('Download Failed [%s]' % (img_url))
         cnt += 1
     zf.close()
     logger.warning('Finish archiving [%s] <<' % (zipfile_path))
@@ -142,7 +169,7 @@ def download(url, output='./output'):
 
     Usage::
 
-        >>> from marumaru-downloader import download
+        >>> from marumaru_downloader import download
         >>> download('http://marumaru.in/b/manga/67808',
         >>>          './output')
     """
