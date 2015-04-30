@@ -58,7 +58,7 @@ def __make_output_dir(output, title):
     '''[Internal]'''
     if not os.path.exists(output):
         os.mkdir(output)
-    title = title.replace(':', '-colon-')
+    title = title.replace(':', '-colon-').replace('?', '-question-').replace('/', '')
     path = os.path.join(output, title)
     if not os.path.exists(path):
         os.mkdir(path)
@@ -91,7 +91,7 @@ def __check_already_downloaded(zipfile_path):
 
 def __save_chapter(session, title, chapter, output):
     '''[Internal]'''
-    working_dir = os.path.join(output, chapter.name.replace(':', '-colon-'))
+    working_dir = os.path.join(output, chapter.name.replace(':', '-colon-').replace('?', '-question-').replace('/', ''))
     zipfile_path = working_dir + '.zip'
 
     if __check_already_downloaded(zipfile_path):
@@ -125,8 +125,8 @@ def __save_chapter(session, title, chapter, output):
             img_url = img.attrs['data-lazy-src']
         else:
             img_url = img.attrs['src']
-        if 'imgur.com' in img_url:
-            continue
+        if 'http://imgur.com' in img_url:
+            img_url = img_url.replace('imgur.com', 'i.imgur.com')
         try_cnt = 3
         while try_cnt > 0:
             try:
