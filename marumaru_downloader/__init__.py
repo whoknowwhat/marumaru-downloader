@@ -141,6 +141,8 @@ def __save_chapter(session, title, chapter, output):
             ext = os.path.splitext(img_url)[1]
             if 'jpg' in ext:
                 ext = '.jpg'
+            elif 'jpeg' in ext:
+                ext = '.jpg'
             elif 'gif' in ext:
                 ext = '.gif'
             elif 'png' in ext:

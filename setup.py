@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='marumaru-downloader',
-      version='0.1.2',
+      version='0.1.3',
       description='Comic Downloader for marumaru.in',
       url='https://github.com/whoknowwhat/marumaru-downloader',
       author='eM',
